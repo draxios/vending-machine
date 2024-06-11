@@ -1,80 +1,70 @@
-resource "aws_iam_role" "lambda_execution_role" {
-  name = "lambda_execution_role"
+data "aws_iam_policy_document" "lambda_assume_role_policy" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+  }
+}
 
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Action = "sts:AssumeRole",
-        Effect = "Allow",
-        Principal = {
-          Service = "lambda.amazonaws.com"
-        }
-      }
+data "aws_iam_policy_document" "lambda_policy_document" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "secretsmanager:GetSecretValue",
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents"
     ]
-  })
+    resources = ["*"]
+  }
 }
 
-resource "aws_iam_policy" "lambda_policy" {
-  name        = "lambda_policy"
-  description = "Policy for Lambda execution role"
+module "lambda_execution_role" {
+  source  = "tfe.csa.stoker.com/stoker-iac/mod-iam-role/aws"
+  version = ">=2.0.0,<3.0.0"
 
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Action = [
-          "secretsmanager:GetSecretValue",
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents"
-        ],
-        Effect = "Allow",
-        Resource = "*"
-      }
-    ]
-  })
+  role_name                             = "lambda_execution_role"
+  role_description                      = "Role for Lambda execution"
+  role_assume_role_policy_document_json = data.aws_iam_policy_document.lambda_assume_role_policy.json
+  role_inline_policies = {
+    "lambda_policy" = data.aws_iam_policy_document.lambda_policy_document.json
+  }
+  tags = {
+    Name = "lambda_execution_role"
+  }
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_policy_attachment" {
-  role       = aws_iam_role.lambda_execution_role.name
-  policy_arn = aws_iam_policy.lambda_policy.arn
+data "aws_iam_policy_document" "step_functions_assume_role_policy" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["states.amazonaws.com"]
+    }
+  }
 }
 
-resource "aws_iam_role" "step_functions_execution_role" {
-  name = "step_functions_execution_role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Action = "sts:AssumeRole",
-        Effect = "Allow",
-        Principal = {
-          Service = "states.amazonaws.com"
-        }
-      }
-    ]
-  })
+data "aws_iam_policy_document" "step_functions_policy_document" {
+  statement {
+    effect = "Allow"
+    actions = ["lambda:InvokeFunction"]
+    resources = ["*"]
+  }
 }
 
-resource "aws_iam_policy" "step_functions_policy" {
-  name        = "step_functions_policy"
-  description = "Policy for Step Functions execution role"
+module "step_functions_execution_role" {
+  source  = "tfe.csa.stoker.com/stoker-iac/mod-iam-role/aws"
+  version = ">=2.0.0,<3.0.0"
 
-  policy = jsonencode({
-    Version = "2012-10-17",
-    Statement = [
-      {
-        Action = "lambda:InvokeFunction",
-        Effect = "Allow",
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "step_functions_policy_attachment" {
-  role       = aws_iam_role.step_functions_execution_role.name
-  policy_arn = aws_iam_policy.step_functions_policy.arn
+  role_name                             = "step_functions_execution_role"
+  role_description                      = "Role for Step Functions execution"
+  role_assume_role_policy_document_json = data.aws_iam_policy_document.step_functions_assume_role_policy.json
+  role_inline_policies = {
+    "step_functions_policy" = data.aws_iam_policy_document.step_functions_policy_document.json
+  }
+  tags = {
+    Name = "step_functions_execution_role"
+  }
 }

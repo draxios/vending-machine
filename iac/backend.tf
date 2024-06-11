@@ -3,9 +3,14 @@ provider "aws" {
 }
 
 terraform {
-  backend "s3" {
-    bucket = "your-terraform-state-bucket"
-    key    = "path/to/your/terraform.tfstate"
-    region = "us-east-1"
+  backend "remote" {
+    hostname     = "app.terraform.io"
+    organization = "your_terraform_organization"
+
+    workspaces {
+      name = "your_workspace_name"
+      # Alternatively, you can use a prefix for dynamically named workspaces
+      # prefix = "your_workspace_prefix"
+    }
   }
 }
